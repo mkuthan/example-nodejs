@@ -23,6 +23,7 @@ $(function () {
 
     var clients = {};
     var cursors = {};
+    var colors = ['red', 'green', 'blue', 'yellow', 'pink'];
 
     var socket = io.connect(url);
 
@@ -47,7 +48,7 @@ $(function () {
             // Draw a line on the canvas. clients[data.id] holds
             // the previous position of this user's mouse pointer
 
-            drawLine(clients[data.id].x, clients[data.id].y, data.x, data.y);
+            drawLine(clients[data.id].x, clients[data.id].y, data.x, data.y, calculateClientColor(data));
         }
 
         // Saving the current client state
@@ -103,14 +104,14 @@ $(function () {
 
         if (drawing) {
 
-            drawLine(prev.x, prev.y, e.pageX, e.pageY);
+            drawLine(prev.x, prev.y, e.pageX, e.pageY, 'black');
 
             prev.x = e.pageX;
             prev.y = e.pageY;
         }
     });
 
-    doc.on('mousemove touchmove', function (e) {
+    doc.on('touchmove', function (e) {
         var pos = getTouchPosition(canvas, e);
 
         if ($.now() - lastEmit > 30) {
@@ -128,7 +129,7 @@ $(function () {
 
         if (drawing) {
 
-            drawLine(prev.x, prev.y, pos.x, pos.y);
+            drawLine(prev.x, prev.y, pos.x, pos.y, 'black');
 
             prev.x = pos.x;
             prev.y = pos.y;
@@ -152,9 +153,11 @@ $(function () {
 
     }, 10000);
 
-    function drawLine(fromx, fromy, tox, toy) {
+    function drawLine(fromx, fromy, tox, toy, color) {
+        ctx.beginPath();
         ctx.moveTo(fromx, fromy);
         ctx.lineTo(tox, toy);
+        ctx.strokeStyle = color;
         ctx.stroke();
     }
 
@@ -164,6 +167,11 @@ $(function () {
             x : e.originalEvent.touches[0].pageX - rect.left,
             y : e.originalEvent.touches[0].pageY - rect.top
         };
+    }
+
+    function calculateClientColor(data) {
+        var numberOfClients = Object.keys(clients).length;
+        return colors[(numberOfClients + colors.length)  % colors.length];
     }
 
 });
