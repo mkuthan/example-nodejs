@@ -6,8 +6,6 @@ $(function () {
         return false;
     }
 
-    var url = 'http://localhost:8080';
-
     var doc = $(document),
         canvas = $('#paper'),
         ctx = canvas[0].getContext('2d'),
@@ -21,7 +19,7 @@ $(function () {
     var clients = {};
     var cursors = {};
 
-    var socket = io.connect(url);
+    var socket = io.connect();
     socket.on('moving', function (data) {
 
         if (!(data.id in clients)) {
@@ -34,7 +32,7 @@ $(function () {
         });
 
         if (data.drawing && clients[data.id]) {
-            drawLine(clients[data.id].x, clients[data.id].y, data.x, data.y, clients[data.id].clientColour);
+            drawLine(clients[data.id].x, clients[data.id].y, data.x, data.y, clients[data.id].colour);
         }
 
         clients[data.id] = data;
@@ -115,7 +113,7 @@ $(function () {
     }
 
     function generateClientColour() {
-        var colours = ['red', 'green', 'blue'];
+        var colours = ['red', 'green', 'blue', 'yellow', 'magenta', 'indigo', 'gray', 'brown'];
         return clientColour = colours[Math.floor(Math.random() * colours.length)];
     }
 

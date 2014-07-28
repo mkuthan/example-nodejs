@@ -6,6 +6,11 @@ var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
+var redis = require('socket.io-redis');
+io.adapter(redis({ host: 'localhost', port: 6379 }));
+
+var port = parseInt(process.argv[2]);
+
 app.use(express.static(path.join(__dirname, 'assets')));
 
 app.get('/', function(req, res){
@@ -19,6 +24,6 @@ io.on('connection', function (socket) {
     });
 });
 
-http.listen(8080, function(){
-    console.log('Board started');
+http.listen(port, function(){
+    console.log('Board started on: ' + port);
 });
