@@ -6,52 +6,37 @@ $(function () {
         return false;
     }
 
-    // The URL of your web server (the port is set in app.js)
-    var url = 'http://192.168.1.105:8080';
+    var url = 'http://localhost:8080';
 
     var doc = $(document),
-        win = $(window),
         canvas = $('#paper'),
         ctx = canvas[0].getContext('2d'),
         instructions = $('#instructions');
 
-    // Generate an unique ID
-    var id = Math.round($.now() * Math.random());
+    var clientId = generateClientId();
+    var clientColour = generateClientColour();
 
-    // A flag for drawing activity
     var drawing = false;
 
     var clients = {};
     var cursors = {};
-    var colors = ['red', 'green', 'blue', 'yellow', 'pink'];
 
     var socket = io.connect(url);
-
     socket.on('moving', function (data) {
 
         if (!(data.id in clients)) {
-            // a new user has come online. create a cursor for them
             cursors[data.id] = $('<div class="cursor">').appendTo('#cursors');
         }
 
-        // Move the mouse pointer
         cursors[data.id].css({
             'left': data.x,
             'top': data.y
         });
 
-        // Is the user drawing?
         if (data.drawing && clients[data.id]) {
-
-            instructions.fadeOut();
-
-            // Draw a line on the canvas. clients[data.id] holds
-            // the previous position of this user's mouse pointer
-
-            drawLine(clients[data.id].x, clients[data.id].y, data.x, data.y, calculateClientColor(data));
+            drawLine(clients[data.id].x, clients[data.id].y, data.x, data.y, clients[data.id].clientColour);
         }
 
-        // Saving the current client state
         clients[data.id] = data;
         clients[data.id].updated = $.now();
     });
@@ -60,103 +45,89 @@ $(function () {
 
     canvas.on('mousedown', function (e) {
         e.preventDefault();
-        drawing = true;
-        prev.x = e.pageX;
-        prev.y = e.pageY;
-
-        // Hide the instructions
-        instructions.fadeOut();
+        onDrawBegin(e.pageX, e.pageY);
     });
 
     canvas.on('touchstart', function (e) {
         e.preventDefault();
-        drawing = true;
-
         var pos = getTouchPosition(canvas, e);
-
-        prev.x = pos.x;
-        prev.y = pos.y;
-
-        // Hide the instructions
-        instructions.fadeOut();
+        onDrawBegin(pos.x, pos.y);
     });
 
-
     doc.bind('mouseup mouseleave touchend', function () {
-        drawing = false;
+        onDrawEnd()
     });
 
     var lastEmit = $.now();
 
     doc.on('mousemove', function (e) {
-        if ($.now() - lastEmit > 30) {
-            socket.emit('move', {
-                'x': e.pageX,
-                'y': e.pageY,
-                'drawing': drawing,
-                'id': id
-            });
-            lastEmit = $.now();
-        }
-
-        // Draw a line for the current user's movement, as it is
-        // not received in the socket.on('moving') event above
-
-        if (drawing) {
-
-            drawLine(prev.x, prev.y, e.pageX, e.pageY, 'black');
-
-            prev.x = e.pageX;
-            prev.y = e.pageY;
-        }
+        onMove(e.pageX, e.pageY);
     });
 
     doc.on('touchmove', function (e) {
         var pos = getTouchPosition(canvas, e);
-
-        if ($.now() - lastEmit > 30) {
-            socket.emit('move', {
-                'x': pos.x,
-                'y': pos.y,
-                'drawing': drawing,
-                'id': id
-            });
-            lastEmit = $.now();
-        }
-
-        // Draw a line for the current user's movement, as it is
-        // not received in the socket.on('moving') event above
-
-        if (drawing) {
-
-            drawLine(prev.x, prev.y, pos.x, pos.y, 'black');
-
-            prev.x = pos.x;
-            prev.y = pos.y;
-        }
+        onMove(pos.x, pos.y);
     });
 
-    // Remove inactive clients after 10 seconds of inactivity
     setInterval(function () {
-
-        for (ident in clients) {
-            if ($.now() - clients[ident].updated > 10000) {
-
-                // Last update was more than 10 seconds ago.
-                // This user has probably closed the page
-
-                cursors[ident].remove();
-                delete clients[ident];
-                delete cursors[ident];
+        for (var id in clients) {
+            if ($.now() - clients[id].updated > 10000) {
+                cursors[id].remove();
+                delete clients[id];
+                delete cursors[id];
             }
         }
 
     }, 10000);
 
-    function drawLine(fromx, fromy, tox, toy, color) {
+    function onDrawBegin(x, y) {
+        drawing = true;
+
+        prev.x = x;
+        prev.y = y;
+    }
+
+    function onDrawEnd() {
+        drawing = false;
+    }
+
+    function onMove(x, y) {
+        if ($.now() - lastEmit > 30) {
+            socket.emit('move', {
+                'x': x,
+                'y': y,
+                'drawing': drawing,
+                'id': clientId,
+                'colour': clientColour
+            });
+            lastEmit = $.now();
+        }
+
+        if (drawing) {
+            drawLine(prev.x, prev.y, x, y, clientColour);
+            prev.x = x;
+            prev.y = y;
+        }
+    }
+
+    function generateClientId() {
+        return Math.round($.now() * Math.random())
+    }
+
+    function generateClientColour() {
+        var colours = ['red', 'green', 'blue'];
+        return clientColour = colours[Math.floor(Math.random() * colours.length)];
+    }
+
+    function drawLine(x1, y1, x2, y2, color) {
+        instructions.fadeOut();
+
         ctx.beginPath();
-        ctx.moveTo(fromx, fromy);
-        ctx.lineTo(tox, toy);
+
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+
+        ctx.lineWidth = 3;
         ctx.strokeStyle = color;
         ctx.stroke();
     }
@@ -164,14 +135,9 @@ $(function () {
     function getTouchPosition(canvas, e) {
         var rect = canvas.offset();
         return {
-            x : e.originalEvent.touches[0].pageX - rect.left,
-            y : e.originalEvent.touches[0].pageY - rect.top
+            x: e.originalEvent.touches[0].pageX - rect.left,
+            y: e.originalEvent.touches[0].pageY - rect.top
         };
-    }
-
-    function calculateClientColor(data) {
-        var numberOfClients = Object.keys(clients).length;
-        return colors[(numberOfClients + colors.length)  % colors.length];
     }
 
 });
